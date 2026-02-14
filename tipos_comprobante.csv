@@ -1,0 +1,10 @@
+Prefijo,Tipo,Descripción
+FV,Factura de Venta,Ventas a clientes
+FC,Factura de Compra,Compras a proveedores
+RP,Recibo de Pago,Pagos a proveedores
+NC,Nota Crédito,Devoluciones en ventas
+CC,Comprobante de Contabilidad,Ajustes y pagos varios
+A,Ajuste de Inventario,Movimientos de mercancía
+TD,Traslado,Traslados entre cuentas bancarias/caja
+NT,Nota de Transferencia,Transferencias de inventario
+RC,Recibo de Caja,Cobros a clientes
