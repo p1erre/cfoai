@@ -21,7 +21,6 @@ from charts import (
     gauge_concentracion,
     nuevos_vs_recurrentes_chart,
     forecast_chart,
-    venta_por_categoria_donut,
 )
 
 st.set_page_config(
@@ -133,10 +132,8 @@ if pagina == "Resumen Ejecutivo":
         st.subheader("Ventas por Trimestre")
         st.plotly_chart(ventas_por_trimestre(df), width="stretch")
 
-    st.subheader("Participación por Categoría")
-    col_cat, col_pad = st.columns([1, 2])
-    with col_cat:
-        st.plotly_chart(venta_por_categoria_donut(df), width="stretch")
+    st.subheader("Top 10 Productos por Ingreso")
+    st.plotly_chart(top_productos(df, 10), width="stretch")
 
 # ══════════════════════════════════════════════════════════════════════════════
 # PÁGINA 2 — Salud Financiera
