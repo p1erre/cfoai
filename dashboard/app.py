@@ -17,6 +17,12 @@ st.set_page_config(
     layout="wide",
 )
 
+st.markdown("""
+<style>
+h1, h2, h3, h4 { color: #1a1a2e !important; }
+</style>
+""", unsafe_allow_html=True)
+
 # ── Datos ─────────────────────────────────────────────────────────────────────
 ventas = load_ventas()
 

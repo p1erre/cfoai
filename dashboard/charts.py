@@ -118,11 +118,12 @@ def pareto_productos(df: pd.DataFrame) -> go.Figure:
         font=dict(color="#e74c3c", size=11),
     )
     fig.update_layout(**_base_layout(
-        xaxis=dict(title="Productos (orden descendente de venta)"),
-        yaxis=dict(title="Venta ($)", tickprefix="$", tickformat=",.0f"),
+        xaxis=dict(title=dict(text="Productos (orden descendente de venta)", font=dict(color=TEXT))),
+        yaxis=dict(title=dict(text="Venta ($)", font=dict(color=TEXT)), tickprefix="$", tickformat=",.0f"),
         yaxis2=dict(
-            title="% acumulado", overlaying="y", side="right", range=[0, 105],
-            tickfont=dict(color=TEXT), title_font=dict(color=TEXT),
+            title=dict(text="% acumulado", font=dict(color=TEXT)),
+            overlaying="y", side="right", range=[0, 105],
+            tickfont=dict(color=TEXT),
         ),
         legend=dict(orientation="h", y=1.05, font=dict(color=TEXT)),
         margin=dict(t=30, b=10),
