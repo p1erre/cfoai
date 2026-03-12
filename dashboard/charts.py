@@ -2,9 +2,41 @@ import plotly.express as px
 import plotly.graph_objects as go
 import pandas as pd
 
-PALETTE = px.colors.qualitative.Set2
-PRIMARY = "#1f4e79"
-ACCENT  = "#2e86ab"
+PALETTE  = px.colors.qualitative.Set2
+PRIMARY  = "#1f4e79"
+ACCENT   = "#2e86ab"
+TEXT     = "#1a1a2e"       # color oscuro para todos los textos
+SUBTEXT  = "#4a4a6a"       # ejes secundarios y leyendas
+
+
+def _base_layout(**kwargs) -> dict:
+    """Layout base con texto legible aplicado a todos los gráficos."""
+    base = dict(
+        plot_bgcolor="white",
+        paper_bgcolor="white",
+        font=dict(color=TEXT, family="Inter, Arial, sans-serif", size=12),
+        xaxis=dict(
+            tickfont=dict(color=TEXT),
+            title_font=dict(color=TEXT),
+            linecolor="#cccccc",
+            gridcolor="#eeeeee",
+        ),
+        yaxis=dict(
+            tickfont=dict(color=TEXT),
+            title_font=dict(color=TEXT),
+            linecolor="#cccccc",
+            gridcolor="#eeeeee",
+        ),
+        legend=dict(font=dict(color=TEXT)),
+        margin=dict(t=10, b=10),
+    )
+    # Merge kwargs, permitiendo sobreescribir
+    for k, v in kwargs.items():
+        if isinstance(v, dict) and k in base and isinstance(base[k], dict):
+            base[k] = {**base[k], **v}
+        else:
+            base[k] = v
+    return base
 
 
 def kpi_card(label: str, value: str, delta: str = None):
@@ -19,12 +51,10 @@ def ventas_mensuales(df: pd.DataFrame) -> go.Figure:
         color_discrete_sequence=[ACCENT],
     )
     fig.update_traces(hovertemplate="<b>%{x|%b %Y}</b><br>$%{y:,.0f}<extra></extra>")
-    fig.update_layout(
+    fig.update_layout(**_base_layout(
         xaxis=dict(tickformat="%b %Y"),
         yaxis=dict(tickprefix="$", tickformat=",.0f"),
-        plot_bgcolor="white", paper_bgcolor="white",
-        margin=dict(t=10, b=10),
-    )
+    ))
     return fig
 
 
@@ -37,11 +67,9 @@ def ventas_por_trimestre(df: pd.DataFrame) -> go.Figure:
         color_discrete_sequence=[PRIMARY],
     )
     fig.update_traces(hovertemplate="<b>%{x}</b><br>$%{y:,.0f}<extra></extra>")
-    fig.update_layout(
+    fig.update_layout(**_base_layout(
         yaxis=dict(tickprefix="$", tickformat=",.0f"),
-        plot_bgcolor="white", paper_bgcolor="white",
-        margin=dict(t=10, b=10),
-    )
+    ))
     return fig
 
 
@@ -59,13 +87,11 @@ def top_productos(df: pd.DataFrame, n: int = 20) -> go.Figure:
         color_discrete_sequence=[ACCENT],
     )
     fig.update_traces(hovertemplate="<b>%{y}</b><br>$%{x:,.0f}<extra></extra>")
-    fig.update_layout(
+    fig.update_layout(**_base_layout(
         xaxis=dict(tickprefix="$", tickformat=",.0f"),
         yaxis=dict(autorange="reversed"),
-        plot_bgcolor="white", paper_bgcolor="white",
-        margin=dict(t=10, b=10),
         height=500,
-    )
+    ))
     return fig
 
 
@@ -91,14 +117,16 @@ def pareto_productos(df: pd.DataFrame) -> go.Figure:
         showarrow=True, arrowhead=2, arrowcolor="#e74c3c",
         font=dict(color="#e74c3c", size=11),
     )
-    fig.update_layout(
+    fig.update_layout(**_base_layout(
         xaxis=dict(title="Productos (orden descendente de venta)"),
         yaxis=dict(title="Venta ($)", tickprefix="$", tickformat=",.0f"),
-        yaxis2=dict(title="% acumulado", overlaying="y", side="right", range=[0, 105]),
-        legend=dict(orientation="h", y=1.05),
-        plot_bgcolor="white", paper_bgcolor="white",
+        yaxis2=dict(
+            title="% acumulado", overlaying="y", side="right", range=[0, 105],
+            tickfont=dict(color=TEXT), title_font=dict(color=TEXT),
+        ),
+        legend=dict(orientation="h", y=1.05, font=dict(color=TEXT)),
         margin=dict(t=30, b=10),
-    )
+    ))
     return fig
 
 
@@ -116,13 +144,11 @@ def top_clientes(df: pd.DataFrame, n: int = 20) -> go.Figure:
         color_discrete_sequence=["#27ae60"],
     )
     fig.update_traces(hovertemplate="<b>%{y}</b><br>$%{x:,.0f}<extra></extra>")
-    fig.update_layout(
+    fig.update_layout(**_base_layout(
         xaxis=dict(tickprefix="$", tickformat=",.0f"),
         yaxis=dict(autorange="reversed"),
-        plot_bgcolor="white", paper_bgcolor="white",
-        margin=dict(t=10, b=10),
         height=500,
-    )
+    ))
     return fig
 
 
@@ -148,11 +174,9 @@ def heatmap_cliente_mes(df: pd.DataFrame, n_clientes: int = 15) -> go.Figure:
         colorscale="Blues",
         hovertemplate="<b>%{y}</b><br>%{x}<br>$%{z:,.0f}<extra></extra>",
     ))
-    fig.update_layout(
+    fig.update_layout(**_base_layout(
         xaxis=dict(title=""),
         yaxis=dict(autorange="reversed"),
-        plot_bgcolor="white", paper_bgcolor="white",
-        margin=dict(t=10, b=10),
         height=max(350, n_clientes * 30),
-    )
+    ))
     return fig
