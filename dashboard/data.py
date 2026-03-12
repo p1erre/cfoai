@@ -2,7 +2,7 @@ import pandas as pd
 import streamlit as st
 from pathlib import Path
 
-DATA_DIR = Path(__file__).parent.parent / "data01"
+DATA_DIR = Path(__file__).parent / "data"
 
 
 @st.cache_data
