@@ -352,6 +352,102 @@ def top_marcas(df: pd.DataFrame, n: int = 15) -> go.Figure:
     return fig
 
 
+# ── Gráficos de Rentabilidad ───────────────────────────────────────────────
+
+
+def margen_mensual_chart(df: pd.DataFrame) -> go.Figure:
+    """Barras agrupadas Venta/Costo + línea de Margen% en eje Y secundario."""
+    fig = go.Figure()
+    fig.add_bar(
+        x=df["Mes_periodo"], y=df["Venta"],
+        name="Venta", marker_color=ACCENT, opacity=0.85,
+        hovertemplate="<b>%{x|%b %Y}</b><br>Venta: $%{y:,.0f}<extra></extra>",
+    )
+    fig.add_bar(
+        x=df["Mes_periodo"], y=df["Costo"],
+        name="Costo", marker_color=RED, opacity=0.7,
+        hovertemplate="<b>%{x|%b %Y}</b><br>Costo: $%{y:,.0f}<extra></extra>",
+    )
+    fig.add_scatter(
+        x=df["Mes_periodo"], y=df["Margen_Pct"],
+        name="Margen %", mode="lines+markers", yaxis="y2",
+        line=dict(color=GREEN, width=3),
+        marker=dict(size=8),
+        hovertemplate="<b>%{x|%b %Y}</b><br>Margen: %{y:.1f}%<extra></extra>",
+    )
+    fig.update_layout(**_base_layout(
+        barmode="group",
+        xaxis=dict(tickformat="%b %Y"),
+        yaxis=dict(tickprefix="$", tickformat=",.0f", title=dict(text="Monto ($)", font=dict(color=TEXT))),
+        yaxis2=dict(
+            title=dict(text="Margen %", font=dict(color=GREEN)),
+            overlaying="y", side="right", range=[0, 100],
+            ticksuffix="%", tickfont=dict(color=GREEN),
+        ),
+        legend=dict(orientation="h", y=1.08),
+        margin=dict(t=30, b=10),
+    ))
+    return fig
+
+
+def margen_por_marca_chart(df: pd.DataFrame, n: int = 15) -> go.Figure:
+    """Barras horizontales de margen% por marca, coloreadas por rango."""
+    top = df.head(n).sort_values("Margen_Pct", ascending=True)
+    colors = [GREEN if v > 30 else ORANGE if v > 15 else RED for v in top["Margen_Pct"]]
+    fig = go.Figure(go.Bar(
+        x=top["Margen_Pct"], y=top["Marca"],
+        orientation="h", marker_color=colors,
+        hovertemplate="<b>%{y}</b><br>Margen: %{x:.1f}%<extra></extra>",
+    ))
+    fig.update_layout(**_base_layout(
+        xaxis=dict(ticksuffix="%", title=dict(text="Margen Bruto %", font=dict(color=TEXT))),
+        yaxis=dict(title=""),
+        height=450,
+    ))
+    return fig
+
+
+def margen_por_producto_chart(df: pd.DataFrame, n: int = 20) -> go.Figure:
+    """Barras horizontales de margen% por producto."""
+    top = df.head(n).sort_values("Margen_Pct", ascending=True)
+    top["label"] = top["Nombre producto"].str[:45]
+    colors = [GREEN if v > 30 else ORANGE if v > 15 else RED for v in top["Margen_Pct"]]
+    fig = go.Figure(go.Bar(
+        x=top["Margen_Pct"], y=top["label"],
+        orientation="h", marker_color=colors,
+        hovertemplate="<b>%{y}</b><br>Margen: %{x:.1f}%<extra></extra>",
+    ))
+    fig.update_layout(**_base_layout(
+        xaxis=dict(ticksuffix="%", title=dict(text="Margen Bruto %", font=dict(color=TEXT))),
+        yaxis=dict(title=""),
+        height=550,
+    ))
+    return fig
+
+
+def tendencia_margen_marcas_chart(df: pd.DataFrame) -> go.Figure:
+    """Líneas de evolución del margen% mensual por marca."""
+    marcas = df["Marca"].unique()
+    fig = go.Figure()
+    colors = PALETTE[:len(marcas)]
+    for i, marca in enumerate(marcas):
+        m = df[df["Marca"] == marca]
+        fig.add_scatter(
+            x=m["Mes_periodo"], y=m["Margen_Pct"],
+            name=marca, mode="lines+markers",
+            line=dict(color=colors[i % len(colors)], width=2),
+            hovertemplate=f"<b>{marca}</b><br>%{{x|%b %Y}}<br>Margen: %{{y:.1f}}%<extra></extra>",
+        )
+    fig.update_layout(**_base_layout(
+        xaxis=dict(tickformat="%b %Y"),
+        yaxis=dict(ticksuffix="%", title=dict(text="Margen Bruto %", font=dict(color=TEXT))),
+        legend=dict(orientation="h", y=1.08),
+        margin=dict(t=30, b=10),
+        height=400,
+    ))
+    return fig
+
+
 def marca_tendencia_mensual(df: pd.DataFrame, n: int = 5) -> go.Figure:
     """Líneas de tendencia mensual para las top N marcas."""
     top_n = df.groupby("Marca")["Venta"].sum().nlargest(n).index.tolist()

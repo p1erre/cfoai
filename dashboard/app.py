@@ -3,6 +3,7 @@ import pandas as pd
 
 from data import (
     load_ventas,
+    load_costos,
     filtrar,
     metricas_comparativas,
     calcular_concentracion,
@@ -11,6 +12,10 @@ from data import (
     nuevos_vs_recurrentes_mensual,
     forecast_lineal,
     generar_insights,
+    margen_mensual,
+    margen_por_producto,
+    margen_por_marca,
+    margen_mensual_por_marca,
 )
 from charts import (
     ventas_mensuales,
@@ -25,6 +30,10 @@ from charts import (
     marca_donut,
     top_marcas,
     marca_tendencia_mensual,
+    margen_mensual_chart,
+    margen_por_marca_chart,
+    margen_por_producto_chart,
+    tendencia_margen_marcas_chart,
 )
 
 st.set_page_config(
@@ -54,6 +63,7 @@ h1, h2, h3, h4 { color: #1a1a2e !important; }
 
 # ── Datos ─────────────────────────────────────────────────────────────────────
 ventas = load_ventas()
+costos = load_costos()
 
 # ── Sidebar ────────────────────────────────────────────────────────────────────
 with st.sidebar:
@@ -77,13 +87,17 @@ with st.sidebar:
     st.divider()
     pagina = st.radio(
         "Vista",
-        ["Resumen Ejecutivo", "Salud Financiera", "Marcas", "Productos", "Clientes"],
+        ["Resumen Ejecutivo", "Rentabilidad", "Salud Financiera", "Marcas", "Productos", "Clientes"],
         index=0,
     )
     st.divider()
     st.caption(f"Datos: {fecha_min.strftime('%d %b %Y')} → {fecha_max.strftime('%d %b %Y')}")
 
 df = filtrar(ventas, fecha_inicio, fecha_fin, categorias_sel)
+
+# Filtrar costos por fecha
+mask_costos = (costos["Fecha"] >= pd.Timestamp(fecha_inicio)) & (costos["Fecha"] <= pd.Timestamp(fecha_fin))
+df_costos = costos[mask_costos]
 
 # Métricas calculadas sobre datos filtrados
 deltas     = metricas_comparativas(df)
@@ -146,7 +160,87 @@ if pagina == "Resumen Ejecutivo":
         st.plotly_chart(marca_donut(df), width="stretch")
 
 # ══════════════════════════════════════════════════════════════════════════════
-# PÁGINA 2 — Salud Financiera
+# PÁGINA 2 — Rentabilidad
+# ══════════════════════════════════════════════════════════════════════════════
+elif pagina == "Rentabilidad":
+    st.title("Rentabilidad")
+    st.caption("Ganancia bruta porcentual por mes, producto y marca.")
+
+    # Cálculos de margen
+    df_margen_mes = margen_mensual(df, df_costos)
+    df_margen_prod = margen_por_producto(df, df_costos)
+    df_margen_marca = margen_por_marca(df, df_costos)
+
+    # KPIs
+    total_venta_r = df_margen_mes["Venta"].sum()
+    total_costo_r = df_margen_mes["Costo"].sum()
+    ganancia_bruta = total_venta_r - total_costo_r
+    margen_global = (ganancia_bruta / total_venta_r * 100) if total_venta_r > 0 else 0
+
+    # Marca más/menos rentable (solo marcas con venta > 1% del total)
+    marcas_sig = df_margen_marca[df_margen_marca["Venta"] > total_venta_r * 0.01]
+    marca_mas = marcas_sig.loc[marcas_sig["Margen_Pct"].idxmax()] if not marcas_sig.empty else None
+    marca_menos = marcas_sig.loc[marcas_sig["Margen_Pct"].idxmin()] if not marcas_sig.empty else None
+
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Margen Bruto %", f"{margen_global:.1f}%")
+    c2.metric("Ganancia Bruta", f"${ganancia_bruta:,.0f}")
+    c3.metric(
+        "Marca Más Rentable",
+        f"{marca_mas['Marca']}" if marca_mas is not None else "—",
+        delta=f"{marca_mas['Margen_Pct']:.1f}%" if marca_mas is not None else None,
+    )
+    c4.metric(
+        "Marca Menos Rentable",
+        f"{marca_menos['Marca']}" if marca_menos is not None else "—",
+        delta=f"{marca_menos['Margen_Pct']:.1f}%" if marca_menos is not None else None,
+        delta_color="inverse",
+    )
+
+    # Margen mensual
+    st.divider()
+    st.subheader("Margen Bruto Mensual")
+    st.plotly_chart(margen_mensual_chart(df_margen_mes), width="stretch")
+
+    # Marcas: margen + tendencia
+    st.divider()
+    col_l, col_r = st.columns([1, 1])
+    with col_l:
+        st.subheader("Top 15 Marcas por Margen %")
+        st.plotly_chart(margen_por_marca_chart(df_margen_marca, 15), width="stretch")
+    with col_r:
+        st.subheader("Tendencia Margen % — Top 5 Marcas")
+        df_tend = margen_mensual_por_marca(df, df_costos, top_n=5)
+        st.plotly_chart(tendencia_margen_marcas_chart(df_tend), width="stretch")
+
+    # Productos por margen
+    st.divider()
+    st.subheader("Top 20 Productos por Margen %")
+    st.plotly_chart(margen_por_producto_chart(df_margen_prod, 20), width="stretch")
+
+    # Tablas detalladas
+    st.divider()
+    with st.expander("📋 Detalle por Marca", expanded=False):
+        tabla_m = df_margen_marca.copy()
+        tabla_m["Venta"] = tabla_m["Venta"].map("${:,.0f}".format)
+        tabla_m["Costo"] = tabla_m["Costo"].map("${:,.0f}".format)
+        tabla_m["Ganancia_Bruta"] = tabla_m["Ganancia_Bruta"].map("${:,.0f}".format)
+        tabla_m["Margen_Pct"] = tabla_m["Margen_Pct"].map("{:.1f}%".format)
+        st.dataframe(tabla_m, width="stretch", height=400)
+
+    with st.expander("📋 Detalle por Producto", expanded=False):
+        tabla_p = df_margen_prod.copy()
+        tabla_p["Venta"] = tabla_p["Venta"].map("${:,.0f}".format)
+        tabla_p["Costo"] = tabla_p["Costo"].map("${:,.0f}".format)
+        tabla_p["Ganancia_Bruta"] = tabla_p["Ganancia_Bruta"].map("${:,.0f}".format)
+        tabla_p["Margen_Pct"] = tabla_p["Margen_Pct"].map("{:.1f}%".format)
+        st.dataframe(
+            tabla_p[["Código producto", "Nombre producto", "Marca", "Venta", "Costo", "Ganancia_Bruta", "Margen_Pct"]],
+            width="stretch", height=400,
+        )
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PÁGINA 3 — Salud Financiera
 # ══════════════════════════════════════════════════════════════════════════════
 elif pagina == "Salud Financiera":
     st.title("Salud Financiera")

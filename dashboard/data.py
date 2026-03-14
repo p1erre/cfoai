@@ -18,6 +18,13 @@ def load_productos() -> pd.DataFrame:
     return pd.read_csv(DATA_DIR / "productos.csv")
 
 
+@st.cache_data
+def load_costos() -> pd.DataFrame:
+    df = pd.read_csv(DATA_DIR / "costos.csv", parse_dates=["Fecha"])
+    df["Mes_periodo"] = df["Fecha"].dt.to_period("M").dt.to_timestamp()
+    return df
+
+
 def filtrar(df: pd.DataFrame, fecha_inicio, fecha_fin, categorias) -> pd.DataFrame:
     mask = (df["Fecha"] >= pd.Timestamp(fecha_inicio)) & (df["Fecha"] <= pd.Timestamp(fecha_fin))
     if categorias:
@@ -164,6 +171,56 @@ def concentracion_marcas(df: pd.DataFrame) -> dict:
         "top3_marcas_pct": round(top3, 1),
         "n_marcas": len(v_marca),
     }
+
+
+def margen_mensual(df_ventas: pd.DataFrame, df_costos: pd.DataFrame) -> pd.DataFrame:
+    """Ganancia bruta y margen % agregado por mes."""
+    v = df_ventas.groupby("Mes_periodo")["Venta"].sum().reset_index()
+    c = df_costos.groupby("Mes_periodo")["Costo"].sum().reset_index()
+    m = v.merge(c, on="Mes_periodo", how="left").fillna(0)
+    m["Ganancia_Bruta"] = m["Venta"] - m["Costo"]
+    m["Margen_Pct"] = (m["Ganancia_Bruta"] / m["Venta"] * 100).where(m["Venta"] > 0, 0)
+    return m.sort_values("Mes_periodo")
+
+
+def margen_por_producto(df_ventas: pd.DataFrame, df_costos: pd.DataFrame) -> pd.DataFrame:
+    """Margen bruto por producto."""
+    v = (
+        df_ventas.groupby(["Código producto", "Nombre producto", "Marca"])
+        .agg(Venta=("Venta", "sum"), Cantidad=("Cantidad", "sum"))
+        .reset_index()
+    )
+    c = df_costos.groupby("Código producto")["Costo"].sum().reset_index()
+    m = v.merge(c, on="Código producto", how="left").fillna(0)
+    m["Ganancia_Bruta"] = m["Venta"] - m["Costo"]
+    m["Margen_Pct"] = (m["Ganancia_Bruta"] / m["Venta"] * 100).where(m["Venta"] > 0, 0)
+    return m.sort_values("Venta", ascending=False)
+
+
+def margen_por_marca(df_ventas: pd.DataFrame, df_costos: pd.DataFrame) -> pd.DataFrame:
+    """Margen bruto agregado por marca."""
+    v = df_ventas.groupby("Marca")["Venta"].sum().reset_index()
+    c = df_costos.groupby("Marca")["Costo"].sum().reset_index()
+    m = v.merge(c, on="Marca", how="left").fillna(0)
+    m["Ganancia_Bruta"] = m["Venta"] - m["Costo"]
+    m["Margen_Pct"] = (m["Ganancia_Bruta"] / m["Venta"] * 100).where(m["Venta"] > 0, 0)
+    return m.sort_values("Venta", ascending=False)
+
+
+def margen_mensual_por_marca(df_ventas: pd.DataFrame, df_costos: pd.DataFrame, top_n: int = 5) -> pd.DataFrame:
+    """Margen % mensual para las top N marcas por venta."""
+    top_marcas = df_ventas.groupby("Marca")["Venta"].sum().nlargest(top_n).index.tolist()
+    v = (
+        df_ventas[df_ventas["Marca"].isin(top_marcas)]
+        .groupby(["Mes_periodo", "Marca"])["Venta"].sum().reset_index()
+    )
+    c = (
+        df_costos[df_costos["Marca"].isin(top_marcas)]
+        .groupby(["Mes_periodo", "Marca"])["Costo"].sum().reset_index()
+    )
+    m = v.merge(c, on=["Mes_periodo", "Marca"], how="left").fillna(0)
+    m["Margen_Pct"] = (((m["Venta"] - m["Costo"]) / m["Venta"]) * 100).where(m["Venta"] > 0, 0)
+    return m.sort_values("Mes_periodo")
 
 
 def generar_insights(df: pd.DataFrame, conc: dict, deltas: dict) -> list:
