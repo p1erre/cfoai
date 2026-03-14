@@ -150,6 +150,22 @@ def forecast_lineal(df: pd.DataFrame, meses_ahead: int = 3) -> pd.DataFrame:
     return pd.DataFrame({"Mes_periodo": futuros, "Venta": y_fut})
 
 
+def concentracion_marcas(df: pd.DataFrame) -> dict:
+    """Métricas de concentración por marca."""
+    if df.empty or "Marca" not in df.columns:
+        return {}
+    total = df["Venta"].sum()
+    v_marca = df.groupby("Marca")["Venta"].sum().sort_values(ascending=False)
+    top1 = v_marca.iloc[0] / total * 100 if len(v_marca) > 0 else 0
+    top3 = v_marca.head(3).sum() / total * 100 if len(v_marca) >= 3 else v_marca.sum() / total * 100
+    return {
+        "top1_marca": v_marca.index[0] if len(v_marca) > 0 else "",
+        "top1_marca_pct": round(top1, 1),
+        "top3_marcas_pct": round(top3, 1),
+        "n_marcas": len(v_marca),
+    }
+
+
 def generar_insights(df: pd.DataFrame, conc: dict, deltas: dict) -> list:
     """Genera lista de insights automáticos basados en los datos."""
     insights = []

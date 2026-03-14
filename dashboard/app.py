@@ -6,6 +6,7 @@ from data import (
     filtrar,
     metricas_comparativas,
     calcular_concentracion,
+    concentracion_marcas,
     clientes_en_riesgo,
     nuevos_vs_recurrentes_mensual,
     forecast_lineal,
@@ -21,6 +22,9 @@ from charts import (
     gauge_concentracion,
     nuevos_vs_recurrentes_chart,
     forecast_chart,
+    marca_donut,
+    top_marcas,
+    marca_tendencia_mensual,
 )
 
 st.set_page_config(
@@ -73,7 +77,7 @@ with st.sidebar:
     st.divider()
     pagina = st.radio(
         "Vista",
-        ["Resumen Ejecutivo", "Salud Financiera", "Productos", "Clientes"],
+        ["Resumen Ejecutivo", "Salud Financiera", "Marcas", "Productos", "Clientes"],
         index=0,
     )
     st.divider()
@@ -84,6 +88,7 @@ df = filtrar(ventas, fecha_inicio, fecha_fin, categorias_sel)
 # Métricas calculadas sobre datos filtrados
 deltas     = metricas_comparativas(df)
 conc       = calcular_concentracion(df)
+conc_marca = concentracion_marcas(df)
 insights   = generar_insights(df, conc, deltas)
 
 
@@ -132,8 +137,13 @@ if pagina == "Resumen Ejecutivo":
         st.subheader("Ventas por Trimestre")
         st.plotly_chart(ventas_por_trimestre(df), width="stretch")
 
-    st.subheader("Top 10 Productos por Ingreso")
-    st.plotly_chart(top_productos(df, 10), width="stretch")
+    col_prod, col_marca = st.columns([3, 2])
+    with col_prod:
+        st.subheader("Top 10 Productos por Ingreso")
+        st.plotly_chart(top_productos(df, 10), width="stretch")
+    with col_marca:
+        st.subheader("Participación por Marca")
+        st.plotly_chart(marca_donut(df), width="stretch")
 
 # ══════════════════════════════════════════════════════════════════════════════
 # PÁGINA 2 — Salud Financiera
@@ -149,7 +159,7 @@ elif pagina == "Salud Financiera":
         "Valores por encima del 60% representan riesgo operativo significativo."
     )
 
-    g1, g2, g3 = st.columns(3)
+    g1, g2, g3, g4 = st.columns(4)
     with g1:
         st.plotly_chart(
             gauge_concentracion(conc.get("top1_cliente_pct", 0), "Top 1 Cliente"),
@@ -163,6 +173,11 @@ elif pagina == "Salud Financiera":
     with g3:
         st.plotly_chart(
             gauge_concentracion(conc.get("top1_producto_pct", 0), "Top 1 Producto"),
+            width="stretch",
+        )
+    with g4:
+        st.plotly_chart(
+            gauge_concentracion(conc_marca.get("top3_marcas_pct", 0), "Top 3 Marcas"),
             width="stretch",
         )
 
@@ -209,7 +224,64 @@ elif pagina == "Salud Financiera":
             )
 
 # ══════════════════════════════════════════════════════════════════════════════
-# PÁGINA 3 — Productos
+# PÁGINA 3 — Marcas
+# ══════════════════════════════════════════════════════════════════════════════
+elif pagina == "Marcas":
+    st.title("Análisis por Marca")
+
+    n_marcas = conc_marca.get("n_marcas", 0)
+    top1_marca = conc_marca.get("top1_marca", "—")
+    top1_marca_pct = conc_marca.get("top1_marca_pct", 0)
+    top3_marcas_pct = conc_marca.get("top3_marcas_pct", 0)
+
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Marcas Activas", f"{n_marcas:,}")
+    c2.metric("Marca #1", top1_marca)
+    c3.metric("% Ingreso Top 1", f"{top1_marca_pct:.1f}%")
+    c4.metric("% Ingreso Top 3", f"{top3_marcas_pct:.1f}%")
+
+    if top3_marcas_pct > 60:
+        st.warning(
+            f"Las top 3 marcas concentran el **{top3_marcas_pct:.0f}%** del ingreso. "
+            "Alta dependencia de proveedores — evaluar alternativas y poder de negociación.",
+            icon="⚠️",
+        )
+
+    st.divider()
+
+    col_l, col_r = st.columns([3, 2])
+    with col_l:
+        st.subheader("Top 15 Marcas por Ingreso")
+        st.plotly_chart(top_marcas(df, 15), width="stretch")
+    with col_r:
+        st.subheader("Participación de Marcas")
+        st.plotly_chart(marca_donut(df), width="stretch")
+
+    st.divider()
+    st.subheader("Tendencia Mensual — Top 5 Marcas")
+    st.caption("Evolución de las 5 marcas con mayor ingreso en el período.")
+    st.plotly_chart(marca_tendencia_mensual(df, 5), width="stretch")
+
+    st.divider()
+    st.subheader("Detalle por Marca")
+    tabla_marca = (
+        df.groupby("Marca")
+        .agg(
+            Productos=("Código producto", "nunique"),
+            Cantidad=("Cantidad", "sum"),
+            Venta=("Venta", "sum"),
+            Facturas=("Comprobante", "nunique"),
+            Clientes=("Nombre tercero", "nunique"),
+        )
+        .sort_values("Venta", ascending=False)
+        .reset_index()
+    )
+    tabla_marca["% Ingreso"] = (tabla_marca["Venta"] / tabla_marca["Venta"].sum() * 100).round(1)
+    tabla_marca["Venta"] = tabla_marca["Venta"].map("${:,.0f}".format)
+    st.dataframe(tabla_marca, width="stretch", height=400)
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PÁGINA 4 — Productos
 # ══════════════════════════════════════════════════════════════════════════════
 elif pagina == "Productos":
     st.title("Análisis de Productos")
@@ -244,7 +316,7 @@ elif pagina == "Productos":
     st.divider()
     st.subheader("Detalle por Producto")
     tabla = (
-        df.groupby(["Código producto", "Descripción", "Categoría"])
+        df.groupby(["Código producto", "Descripción", "Marca"])
         .agg(Cantidad=("Cantidad", "sum"), Venta=("Venta", "sum"), Facturas=("Comprobante", "nunique"))
         .sort_values("Venta", ascending=False)
         .reset_index()

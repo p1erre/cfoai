@@ -304,3 +304,77 @@ def venta_por_categoria_donut(df: pd.DataFrame) -> go.Figure:
         margin=dict(t=10, b=10, l=10, r=10),
     ))
     return fig
+
+
+# ── Gráficos de Marcas ──────────────────────────────────────────────────────
+
+def marca_donut(df: pd.DataFrame, n: int = 10) -> go.Figure:
+    """Donut con participación de las top N marcas en ingresos."""
+    marca = df.groupby("Marca")["Venta"].sum().sort_values(ascending=False)
+    top = marca.head(n)
+    otros = marca.iloc[n:].sum()
+    if otros > 0:
+        top = pd.concat([top, pd.Series({"Otras": otros})])
+    fig = go.Figure(go.Pie(
+        labels=top.index,
+        values=top.values,
+        hole=0.5,
+        textinfo="label+percent",
+        hovertemplate="<b>%{label}</b><br>$%{value:,.0f}<br>%{percent}<extra></extra>",
+        marker=dict(colors=PALETTE * 3),
+    ))
+    fig.update_layout(**_base_layout(
+        showlegend=True,
+        legend=dict(font=dict(size=10)),
+        height=350,
+        margin=dict(t=10, b=10, l=10, r=10),
+    ))
+    return fig
+
+
+def top_marcas(df: pd.DataFrame, n: int = 15) -> go.Figure:
+    """Barras horizontales de las top N marcas por ingreso."""
+    marca = (
+        df.groupby("Marca")["Venta"].sum().reset_index()
+        .sort_values("Venta", ascending=False).head(n)
+    )
+    fig = px.bar(
+        marca, x="Venta", y="Marca", orientation="h",
+        labels={"Venta": "Venta ($)", "Marca": ""},
+        color_discrete_sequence=[PRIMARY],
+    )
+    fig.update_traces(hovertemplate="<b>%{y}</b><br>$%{x:,.0f}<extra></extra>")
+    fig.update_layout(**_base_layout(
+        xaxis=dict(tickprefix="$", tickformat=",.0f"),
+        yaxis=dict(autorange="reversed"),
+        height=450,
+    ))
+    return fig
+
+
+def marca_tendencia_mensual(df: pd.DataFrame, n: int = 5) -> go.Figure:
+    """Líneas de tendencia mensual para las top N marcas."""
+    top_n = df.groupby("Marca")["Venta"].sum().nlargest(n).index.tolist()
+    sub = df[df["Marca"].isin(top_n)]
+    mensual = (
+        sub.groupby(["Mes_periodo", "Marca"])["Venta"].sum()
+        .reset_index()
+    )
+    fig = go.Figure()
+    colors = PALETTE[:n]
+    for i, marca in enumerate(top_n):
+        m = mensual[mensual["Marca"] == marca]
+        fig.add_scatter(
+            x=m["Mes_periodo"], y=m["Venta"],
+            name=marca, mode="lines+markers",
+            line=dict(color=colors[i % len(colors)], width=2),
+            hovertemplate=f"<b>{marca}</b><br>%{{x|%b %Y}}<br>${{y:,.0f}}<extra></extra>",
+        )
+    fig.update_layout(**_base_layout(
+        xaxis=dict(tickformat="%b %Y"),
+        yaxis=dict(tickprefix="$", tickformat=",.0f"),
+        legend=dict(orientation="h", y=1.08),
+        margin=dict(t=30, b=10),
+        height=400,
+    ))
+    return fig
